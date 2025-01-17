@@ -14,7 +14,10 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../client/build')));
 
 // MongoDB connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/cs499')
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/cs499', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
     .then(() => console.log('MongoDB connected'))
     .catch(err => {
         console.error('MongoDB connection error:', err);

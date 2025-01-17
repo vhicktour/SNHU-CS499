@@ -2,12 +2,28 @@ const express = require('express');
 const router = express.Router();
 const Animal = require('../models/Animal');
 
-// Get all animals with optional limit
+// Get all animals with pagination
 router.get('/', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 100;
-    const animals = await Animal.find().limit(limit);
-    res.json(animals);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const [animals, total] = await Promise.all([
+      Animal.find()
+        .select('-__v')
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Animal.countDocuments()
+    ]);
+
+    res.json({
+      animals,
+      totalCount: total,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -16,21 +32,43 @@ router.get('/', async (req, res) => {
 // Get animals by rescue type
 router.get('/rescue/:type', async (req, res) => {
   try {
-    let animals;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    let query;
     switch (req.params.type.toLowerCase()) {
       case 'water':
-        animals = await Animal.getWaterRescue();
+        query = Animal.getWaterRescue();
         break;
       case 'mountain':
-        animals = await Animal.getMountainRescue();
+        query = Animal.getMountainRescue();
         break;
       case 'disaster':
-        animals = await Animal.getDisasterRescue();
+        query = Animal.getDisasterRescue();
+        break;
+      case 'wilderness':
+        query = Animal.getWildernessRescue();
         break;
       default:
-        animals = await Animal.find().limit(100);
+        return res.status(400).json({ message: 'Invalid rescue type' });
     }
-    res.json(animals);
+
+    const [animals, total] = await Promise.all([
+      query
+        .select('-__v')
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Animal.countDocuments(query.getQuery())
+    ]);
+
+    res.json({
+      animals,
+      totalCount: total,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit)
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

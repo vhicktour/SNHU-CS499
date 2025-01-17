@@ -4,35 +4,44 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
 // Fix for default marker icons in React-Leaflet
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
-  iconUrl: require('leaflet/dist/images/marker-icon.png'),
-  shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+const defaultIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
 });
 
-const AnimalMap = ({ center, zoom, selectedAnimal }) => {
+L.Marker.prototype.options.icon = defaultIcon;
+
+const AnimalMap = ({ selectedAnimal }) => {
+  // Center on Austin, TX
+  const defaultCenter = [30.75, -97.48];
+  const defaultZoom = 10;
+
   return (
-    <div className="h-96 w-full rounded-lg overflow-hidden">
-      <MapContainer 
-        center={center} 
-        zoom={zoom} 
+    <div className="h-[500px] w-full rounded-lg overflow-hidden shadow">
+      <MapContainer
+        center={defaultCenter}
+        zoom={defaultZoom}
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; OpenStreetMap contributors'
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
-        
         {selectedAnimal && selectedAnimal.location_lat && selectedAnimal.location_long && (
           <Marker 
             position={[selectedAnimal.location_lat, selectedAnimal.location_long]}
+            icon={defaultIcon}
           >
             <Popup>
-              <div>
-                <h3 className="font-semibold">{selectedAnimal.name || 'Unknown'}</h3>
-                <p>{selectedAnimal.breed}</p>
-                <p>{selectedAnimal.age_upon_outcome}</p>
+              <div className="p-2">
+                <h3 className="font-bold text-lg mb-2">{selectedAnimal.name || 'Unknown'}</h3>
+                <p><span className="font-semibold">Breed:</span> {selectedAnimal.breed}</p>
+                <p><span className="font-semibold">Type:</span> {selectedAnimal.animal_type}</p>
               </div>
             </Popup>
           </Marker>

@@ -17,7 +17,8 @@ const AnimalSchema = new mongoose.Schema({
   outcome_type: String,
   sex_upon_outcome: String
 }, {
-  timestamps: true
+  timestamps: true,
+  collection: 'shelter_outcomes' // Explicitly set collection name
 });
 
 // Indexes for better query performance
