@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Box,
   Text,
@@ -59,38 +59,96 @@ const StatCard = ({ icon, label, value, color }) => {
 };
 
 const Dashboard = () => {
-  const { stats } = useAnimals();
+  const { animals, refreshData } = useAnimals();
   const bg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.100', 'gray.700');
   const textColor = useColorModeValue('gray.600', 'gray.400');
 
-  // Use stats data if available, otherwise fallback to default values
-  const dogsAvailable = stats?.overview?.dogs || 124;
-  const catsAvailable = stats?.overview?.cats || 89;
-  const adoptionRate = stats?.overview?.adoptionRate || 75;
+  const stats = useMemo(() => {
+    if (!animals || animals.length === 0) return null;
 
-  // Transform breed stats into array format
-  const breedData = stats?.breedStats ? 
-    Object.entries(stats.breedStats)
+    // Count animals by type
+    const dogs = animals.filter(animal => animal.animal_type === 'Dog');
+    const cats = animals.filter(animal => animal.animal_type === 'Cat');
+    
+    // Calculate breed distribution
+    const breedCount = animals.reduce((acc, animal) => {
+      const breed = animal.breed?.replace(' Mix', ''); // Remove 'Mix' suffix for cleaner display
+      if (breed) {
+        acc[breed] = (acc[breed] || 0) + 1;
+      }
+      return acc;
+    }, {});
+
+    // Calculate adoption/transfer rate (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const recentOutcomes = animals.filter(animal => {
+      const outcomeDate = new Date(animal.datetime);
+      return outcomeDate > thirtyDaysAgo && 
+             (animal.outcome_type === 'Adoption' || animal.outcome_type === 'Transfer');
+    }).length;
+
+    const adoptionRate = Math.round((recentOutcomes / animals.length) * 100);
+
+    // Calculate location distribution
+    const locationCount = animals.reduce((acc, animal) => {
+      if (animal.location_lat && animal.location_long) {
+        const locationKey = `${animal.location_lat.toFixed(2)},${animal.location_long.toFixed(2)}`;
+        acc[locationKey] = (acc[locationKey] || 0) + 1;
+      }
+      return acc;
+    }, {});
+
+    const locationStats = Object.entries(locationCount)
       .map(([name, count]) => ({
-        name,
-        value: count
+        name: `Location ${name}`,
+        percentage: Math.round((count / animals.length) * 100)
       }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 3) : 
-    [
-      { name: 'Labrador', value: 30 },
-      { name: 'German Shepherd', value: 25 },
-      { name: 'Golden Retriever', value: 20 },
-    ];
+      .sort((a, b) => b.percentage - a.percentage)
+      .slice(0, 5); // Show top 5 locations
 
-  const locationData = stats?.locationStats || [
-    { name: 'North Austin', percentage: 45 },
-    { name: 'South Austin', percentage: 30 },
-    { name: 'Central Austin', percentage: 25 },
-  ];
+    return {
+      dogsAvailable: dogs.length,
+      catsAvailable: cats.length,
+      adoptionRate,
+      breedStats: Object.entries(breedCount)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 3), // Top 3 breeds
+      locationStats
+    };
+  }, [animals]);
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+
+  const handleExport = () => {
+    if (!animals || animals.length === 0) return;
+
+    // Create CSV data
+    const csvData = animals.map(animal => ({
+      animal_id: animal.animal_id,
+      animal_type: animal.animal_type,
+      breed: animal.breed,
+      age: animal.age_upon_outcome,
+      outcome: animal.outcome_type,
+      datetime: new Date(animal.datetime).toLocaleDateString(),
+      location: `${animal.location_lat},${animal.location_long}`
+    }));
+    
+    const csvContent = "data:text/csv;charset=utf-8," + 
+      Object.keys(csvData[0]).join(",") + "\n" +
+      csvData.map(row => Object.values(row).join(",")).join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "animal_stats.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <MotionBox
@@ -115,10 +173,7 @@ const Dashboard = () => {
                   size="sm"
                   variant="ghost"
                   leftIcon={<FaSync />}
-                  _hover={{
-                    transform: 'rotate(180deg)',
-                  }}
-                  transition="all 0.3s"
+                  onClick={refreshData}
                 >
                   Refresh
                 </Button>
@@ -128,6 +183,7 @@ const Dashboard = () => {
                   size="sm"
                   variant="ghost"
                   leftIcon={<FaDownload />}
+                  onClick={handleExport}
                 >
                   Export
                 </Button>
@@ -138,27 +194,27 @@ const Dashboard = () => {
           <SimpleGrid columns={2} spacing={4}>
             <StatCard
               icon={FaDog}
-              label="Dogs Available"
-              value={dogsAvailable}
+              label="Dogs"
+              value={stats?.dogsAvailable || 0}
               color="blue.500"
             />
             <StatCard
               icon={FaCat}
-              label="Cats Available"
-              value={catsAvailable}
+              label="Cats"
+              value={stats?.catsAvailable || 0}
               color="purple.500"
             />
           </SimpleGrid>
 
           <Box>
             <Text mb={2} fontSize="sm" fontWeight="medium" color={textColor}>
-              Breed Distribution
+              Top Breeds
             </Text>
             <Box height="200px">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={breedData}
+                    data={stats?.breedStats || []}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -166,8 +222,9 @@ const Dashboard = () => {
                     fill="#8884d8"
                     paddingAngle={5}
                     dataKey="value"
+                    label={({name, value}) => `${name}: ${value}`}
                   >
-                    {breedData.map((entry, index) => (
+                    {(stats?.breedStats || []).map((entry, index) => (
                       <Cell
                         key={`cell-${index}`}
                         fill={COLORS[index % COLORS.length]}
@@ -182,10 +239,10 @@ const Dashboard = () => {
 
           <Box>
             <Text mb={2} fontSize="sm" fontWeight="medium" color={textColor}>
-              Adoption Rate
+              30-Day Outcome Rate
             </Text>
             <Progress
-              value={adoptionRate}
+              value={stats?.adoptionRate || 0}
               size="sm"
               colorScheme="green"
               borderRadius="full"
@@ -193,7 +250,7 @@ const Dashboard = () => {
               isAnimated
             />
             <Text mt={1} fontSize="sm" color={textColor}>
-              {adoptionRate}% success rate this month
+              {stats?.adoptionRate || 0}% adoption/transfer rate in last 30 days
             </Text>
           </Box>
 
@@ -202,7 +259,7 @@ const Dashboard = () => {
               Location Distribution
             </Text>
             <VStack align="stretch" spacing={2}>
-              {locationData.map(location => (
+              {(stats?.locationStats || []).map(location => (
                 <Box key={location.name}>
                   <HStack justify="space-between">
                     <Text fontSize="sm">{location.name}</Text>
