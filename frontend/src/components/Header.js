@@ -14,6 +14,7 @@ import {
   InputGroup,
   InputLeftElement,
   Stack,
+  Image,
 } from '@chakra-ui/react';
 import { HamburgerIcon, MoonIcon, SunIcon } from '@chakra-ui/icons';
 import { FaSearch, FaUser } from 'react-icons/fa';
@@ -65,13 +66,21 @@ export default function Header() {
         <HStack spacing={8} alignItems="center" flex={1}>
           <Box>
             <RouterLink to="/">
-              <Box 
-                fontSize="xl" 
-                fontWeight="bold" 
-                color={useColorModeValue('blue.500', 'blue.300')}
-              >
-                Animal Rescue
-              </Box>
+              <HStack spacing={2}>
+                <Image
+                  src="/logo/grazioso-logo.png"
+                  alt="Grazioso Logo"
+                  height="32px"
+                  width="auto"
+                />
+                <Box 
+                  fontSize="xl" 
+                  fontWeight="bold" 
+                  color={useColorModeValue('blue.500', 'blue.300')}
+                >
+                  Animal Rescue
+                </Box>
+              </HStack>
             </RouterLink>
           </Box>
 

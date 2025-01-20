@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Box,
   SimpleGrid,
@@ -61,35 +61,106 @@ const StatCard = ({ title, stat, icon, helpText }) => {
 };
 
 const StatsOverview = () => {
-  const { stats } = useAnimals();
-  const overview = stats?.overview || {};
+  const { animals } = useAnimals();
 
-  const statsData = [
-    {
-      title: 'Total Animals',
-      stat: overview.totalAnimals || 0,
-      icon: FaDog,
-      helpText: 'In our database',
-    },
-    {
-      title: 'Water Rescue',
-      stat: overview.waterRescue || 0,
-      icon: FaWater,
-      helpText: 'Potential candidates',
-    },
-    {
-      title: 'Mountain Rescue',
-      stat: overview.mountainRescue || 0,
-      icon: FaMountain,
-      helpText: 'Available for training',
-    },
-    {
-      title: 'Disaster Rescue',
-      stat: overview.disasterRescue || 0,
-      icon: FaExclamationTriangle,
-      helpText: 'Ready for deployment',
-    },
-  ];
+  // Calculate statistics from filtered animals
+  const statsData = useMemo(() => {
+    if (!animals) return [];
+
+    const totalCount = animals.length;
+    
+    // Count animals by rescue type
+    const waterRescueCount = animals.filter(animal => 
+      animal.rescueType === 'water'
+    ).length;
+
+    const mountainRescueCount = animals.filter(animal => 
+      animal.rescueType === 'mountain'
+    ).length;
+
+    const disasterRescueCount = animals.filter(animal => 
+      animal.rescueType === 'disaster'
+    ).length;
+
+    return [
+      {
+        title: 'Total Animals',
+        stat: totalCount.toLocaleString(),
+        icon: FaDog,
+        helpText: 'Current results',
+      },
+      {
+        title: 'Water Rescue',
+        stat: waterRescueCount.toLocaleString(),
+        icon: FaWater,
+        helpText: `${((waterRescueCount / totalCount) * 100).toFixed(1)}% of total`,
+      },
+      {
+        title: 'Mountain Rescue',
+        stat: mountainRescueCount.toLocaleString(),
+        icon: FaMountain,
+        helpText: `${((mountainRescueCount / totalCount) * 100).toFixed(1)}% of total`,
+      },
+      {
+        title: 'Disaster Rescue',
+        stat: disasterRescueCount.toLocaleString(),
+        icon: FaExclamationTriangle,
+        helpText: `${((disasterRescueCount / totalCount) * 100).toFixed(1)}% of total`,
+      },
+    ];
+  }, [animals]);
+
+  // If there's no data, show zeros but maintain the layout
+  if (!animals || animals.length === 0) {
+    const emptyStats = [
+      {
+        title: 'Total Animals',
+        stat: '0',
+        icon: FaDog,
+        helpText: 'No animals found',
+      },
+      {
+        title: 'Water Rescue',
+        stat: '0',
+        icon: FaWater,
+        helpText: 'No animals found',
+      },
+      {
+        title: 'Mountain Rescue',
+        stat: '0',
+        icon: FaMountain,
+        helpText: 'No animals found',
+      },
+      {
+        title: 'Disaster Rescue',
+        stat: '0',
+        icon: FaExclamationTriangle,
+        helpText: 'No animals found',
+      },
+    ];
+
+    return (
+      <Box py={8}>
+        <SimpleGrid
+          columns={{ base: 1, md: 2, lg: 4 }}
+          spacing={{ base: 5, lg: 8 }}
+        >
+          {emptyStats.map((stat, index) => (
+            <MotionBox
+              key={stat.title}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+            >
+              <Stat>
+                <StatCard {...stat} />
+              </Stat>
+            </MotionBox>
+          ))}
+        </SimpleGrid>
+      </Box>
+    );
+  }
 
   return (
     <Box py={8}>

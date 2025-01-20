@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   Box,
   Container,
@@ -17,6 +17,7 @@ import {
 } from '@chakra-ui/react';
 import { useAnimals } from '../context/AnimalsContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useMemo } from 'react';
 
 const StatCard = ({ label, value, helpText }) => {
   const bg = useColorModeValue('white', 'gray.700');
@@ -43,17 +44,59 @@ const StatCard = ({ label, value, helpText }) => {
 };
 
 const Statistics = () => {
-  const { stats, loading, error, refreshData } = useAnimals();
+  const { animals, loading, error } = useAnimals();
   const chartBg = useColorModeValue('white', 'gray.700');
   const textColor = useColorModeValue('gray.600', 'gray.200');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
-  useEffect(() => {
-    // Only fetch stats if they're not already loaded
-    if (!stats) {
-      refreshData();
-    }
-  }, [refreshData, stats]);
+  // Calculate statistics from filtered animals data
+  const stats = useMemo(() => {
+    if (!animals || animals.length === 0) return null;
+
+    // Count animals by type
+    const dogCount = animals.filter(animal => animal.type === 'dog').length;
+    const catCount = animals.filter(animal => animal.type === 'cat').length;
+    const totalAnimals = animals.length;
+    const otherCount = totalAnimals - (dogCount + catCount);
+
+    // Calculate average age
+    const totalAge = animals.reduce((sum, animal) => sum + (animal.age || 0), 0);
+    const averageAge = totalAge / totalAnimals;
+
+    // Count adoptions and new arrivals in the last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const adoptionsThisMonth = animals.filter(animal => {
+      const adoptionDate = animal.adoptionDate ? new Date(animal.adoptionDate) : null;
+      return adoptionDate && adoptionDate > thirtyDaysAgo;
+    }).length;
+
+    const newArrivals = animals.filter(animal => {
+      const arrivalDate = animal.arrivalDate ? new Date(animal.arrivalDate) : null;
+      return arrivalDate && arrivalDate > thirtyDaysAgo;
+    }).length;
+
+    // Count breeds
+    const breedCounts = animals.reduce((acc, animal) => {
+      const breed = animal.breed || 'Unknown';
+      acc[breed] = (acc[breed] || 0) + 1;
+      return acc;
+    }, {});
+
+    return {
+      overview: {
+        totalAnimals,
+        dogCount,
+        catCount,
+        otherCount,
+        averageAge,
+        adoptionsThisMonth,
+        newArrivals
+      },
+      breedStats: breedCounts
+    };
+  }, [animals]);
 
   const renderContent = () => {
     if (loading) {
@@ -87,7 +130,7 @@ const Statistics = () => {
       );
     }
 
-    if (!stats?.overview || !stats?.breedStats) {
+    if (!stats || !animals.length) {
       return (
         <Alert
           status="info"
@@ -101,24 +144,23 @@ const Statistics = () => {
         >
           <AlertIcon boxSize="40px" mr={0} />
           <AlertTitle mt={4} mb={1} fontSize="lg">
-            No Statistics Available
+            No Animals Found
           </AlertTitle>
           <AlertDescription maxWidth="sm">
-            Please try again later.
+            Try adjusting your filters to see more results.
           </AlertDescription>
         </Alert>
       );
     }
 
-    const { overview, breedStats } = stats;
+    const { overview } = stats;
 
     // Calculate percentages
-    const dogPercentage = ((overview.dogCount || 0) / (overview.totalAnimals || 1) * 100).toFixed(1);
-    const catPercentage = ((overview.catCount || 0) / (overview.totalAnimals || 1) * 100).toFixed(1);
-    const otherCount = (overview.totalAnimals || 0) - ((overview.dogCount || 0) + (overview.catCount || 0));
+    const dogPercentage = ((overview.dogCount) / overview.totalAnimals * 100).toFixed(1);
+    const catPercentage = ((overview.catCount) / overview.totalAnimals * 100).toFixed(1);
 
     // Transform breed stats for the chart
-    const chartData = Object.entries(breedStats)
+    const chartData = Object.entries(stats.breedStats)
       .map(([breed, count]) => ({
         breed,
         count: Number(count)
@@ -132,21 +174,21 @@ const Statistics = () => {
           <StatCard
             label="Total Animals"
             value={overview.totalAnimals.toLocaleString()}
-            helpText="Current shelter population"
+            helpText="Current filtered results"
           />
           <StatCard
             label="Dogs"
             value={overview.dogCount.toLocaleString()}
-            helpText={`${dogPercentage}% of total`}
+            helpText={`${dogPercentage}% of filtered total`}
           />
           <StatCard
             label="Cats"
             value={overview.catCount.toLocaleString()}
-            helpText={`${catPercentage}% of total`}
+            helpText={`${catPercentage}% of filtered total`}
           />
           <StatCard
             label="Other Animals"
-            value={otherCount.toLocaleString()}
+            value={overview.otherCount.toLocaleString()}
             helpText="Including birds, rabbits, etc."
           />
         </SimpleGrid>
@@ -159,7 +201,7 @@ const Statistics = () => {
           borderColor={borderColor}
           mb={8}
         >
-          <Heading size="md" mb={6}>Top 10 Breeds</Heading>
+          <Heading size="md" mb={6}>Top Breeds in Current Results</Heading>
           <Box height="400px">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 70 }}>
@@ -189,12 +231,12 @@ const Statistics = () => {
           <StatCard
             label="Average Age"
             value={`${overview.averageAge.toFixed(1)} years`}
-            helpText="Average age of animals"
+            helpText="Average age in current results"
           />
           <StatCard
-            label="Adoptions This Month"
+            label="Recent Adoptions"
             value={overview.adoptionsThisMonth.toLocaleString()}
-            helpText="Successfully placed"
+            helpText="Last 30 days"
           />
           <StatCard
             label="New Arrivals"

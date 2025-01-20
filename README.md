@@ -142,4 +142,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📫 Contact
 
-Victor Hickman - [@vhicktour](https://github.com/vhicktour)
+Victor Udeh - [@vhicktour](https://github.com/vhicktour)
