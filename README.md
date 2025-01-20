@@ -1,145 +1,102 @@
-# Animal Rescue Management System (V3)
+# Animal Rescue Management System
 
-A comprehensive web application for managing animal rescue operations, built with React and Node.js. This version includes enhanced features for tracking, managing, and visualizing animal rescue data.
+## Overview
+A comprehensive web application for managing animal rescue operations. This platform helps rescue organizations track, manage, and visualize their rescue operations efficiently.
 
-## 🚀 Features
+## Key Features
 
 ### Dashboard
 - Real-time statistics and metrics
 - Interactive data visualization
-- Quick access to key information
-- Light/Dark mode support
-
-### Map View
-- Geographic visualization of rescue locations
-- Interactive markers with animal details
-- Clustering for multiple rescues in the same area
+- Dark/Light mode support
+- Lottie animations for enhanced user experience
+- Responsive design for all devices
 
 ### Statistics
-- Comprehensive analytics
-- Breed distribution charts
-- Rescue type breakdown
-- Adoption rate tracking
-- Age distribution visualization
+- Track rescue operations by type:
+  - Water Rescue
+  - Mountain Rescue
+  - Disaster Rescue
+- View success rates and trends
+- Monitor rescue outcomes
+- Export capabilities
 
 ### Smart Filtering
-- Multi-criteria filtering system
-- Dynamic breed selection based on animal type
-- Age range slider
-- Rescue type categorization
-- Outcome status filtering
+- Multi-criteria search system
+- Dynamic breed selection
+- Age range filtering
+- Status tracking
 
-## 🛠 Technology Stack
+## Tech Stack
 
 ### Frontend
 - React.js
 - Chakra UI for modern, accessible components
+- Lottie for animations
 - React Router for navigation
 - Axios for API communication
-- Recharts for data visualization
 
 ### Backend
 - Node.js
 - Express.js
-- MongoDB for data storage
-- RESTful API architecture
+- MongoDB
+- Mongoose
 
-## 🔧 Installation
+## Getting Started
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/vhicktour/SNHU-CS499.git
-   cd SNHU-CS499
-   git checkout V3
-   ```
+```bash
+git clone https://github.com/vhicktour/SNHU-CS499.git
+cd SNHU-CS499
+```
 
 2. Install dependencies:
-   ```bash
-   # Install backend dependencies
-   cd backend
-   npm install
+```bash
+# Frontend
+cd frontend
+npm install
 
-   # Install frontend dependencies
-   cd ../frontend
-   npm install
-   ```
+# Backend
+cd ../backend
+npm install
+```
 
-3. Set up environment variables:
-   Create `.env` files in both frontend and backend directories with necessary configurations.
+3. Start the development servers:
+```bash
+# Frontend
+cd frontend
+npm start
 
-4. Start the application:
-   ```bash
-   # Start backend server
-   cd backend
-   npm start
+# Backend
+cd backend
+npm start
+```
 
-   # Start frontend development server
-   cd ../frontend
-   npm start
-   ```
+## Environment Setup
+Create `.env` files in both frontend and backend directories:
 
-## 🔑 Environment Variables
-
-### Backend
-```env
+### Backend (.env)
+```
 PORT=5000
 MONGODB_URI=your_mongodb_connection_string
 ```
 
-### Frontend
-```env
+### Frontend (.env)
+```
 REACT_APP_API_URL=http://localhost:5000
 ```
 
-## 📊 API Endpoints
+## API Endpoints
 
 ### Animals
-- `GET /api/animals` - Get all animals
-- `GET /api/animals/stats/overview` - Get overview statistics
-- `GET /api/animals/stats/breed` - Get breed statistics
-- `GET /api/animals/stats/location` - Get location statistics
+- GET /api/animals - Fetch all animals
+- GET /api/animals/stats - Get statistics
+- POST /api/animals - Add new animal
+- PUT /api/animals/:id - Update animal
+- DELETE /api/animals/:id - Remove animal
 
-## 🎨 Features & Improvements in V3
+## Contact
 
-1. **Enhanced UI/UX**
-   - Modern, responsive design
-   - Intuitive navigation
-   - Improved accessibility
-   - Dark mode support
-
-2. **Advanced Filtering**
-   - Dynamic breed filtering
-   - Multi-criteria search
-   - Real-time filter updates
-
-3. **Optimized Performance**
-   - Client-side filtering
-   - Memoized components
-   - Efficient data handling
-
-4. **Improved Data Visualization**
-   - Interactive charts
-   - Real-time statistics
-   - Geographic mapping
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- SNHU CS-499 Course
-- Animal Rescue Community
-- Open Source Contributors
-
-## 📫 Contact
-
-Victor Udeh - [@vhicktour](https://github.com/vhicktour)
+Victor Udeh
+- GitHub: [@vhicktour](https://github.com/vhicktour)
+- LinkedIn: [Victor Udeh](https://www.linkedin.com/in/victorudeh/)
