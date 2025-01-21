@@ -86,6 +86,77 @@ MONGODB_URI=your_mongodb_connection_string
 REACT_APP_API_URL=http://localhost:5000
 ```
 
+## Build and Deployment
+
+This project consists of two main parts: a React frontend and a Node.js/Express backend. Here's how to build and run the application:
+
+### Development Mode
+
+1. Start the Frontend Development Server:
+```bash
+cd frontend
+npm install
+npm start
+```
+The frontend will run on http://localhost:3000
+
+2. Start the Backend Server (in a new terminal):
+```bash
+cd backend
+npm install
+npm start
+```
+The backend will run on http://localhost:5000
+
+### Production Mode
+
+1. Build the Frontend:
+```bash
+cd frontend
+npm install
+npm run build
+```
+This will create a production build in the `frontend/build` directory.
+
+2. Start the Production Server:
+```bash
+cd backend
+npm install
+npm start
+```
+The application will be available at http://localhost:5000
+
+### Environment Variables
+
+#### Frontend (.env)
+```
+REACT_APP_API_URL=http://localhost:5000
+```
+
+#### Backend (.env)
+```
+PORT=5000
+MONGODB_URI=your_mongodb_connection_string
+```
+
+### Deployment Tips
+
+1. Make sure all dependencies are installed in both frontend and backend:
+   ```bash
+   cd frontend && npm install
+   cd ../backend && npm install
+   ```
+
+2. For production deployment:
+   - Build the frontend first
+   - The backend will serve the static files from the frontend build
+   - Set environment variables according to your production setup
+
+3. Common issues:
+   - Ensure MongoDB is running and accessible
+   - Check if all environment variables are properly set
+   - Verify the API URL in frontend matches your backend URL
+
 ## API Endpoints
 
 ### Animals

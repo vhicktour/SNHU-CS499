@@ -106,12 +106,12 @@ app.use((err, req, res, next) => {
  */
 if (!CONFIG.isDevelopment) {
     // Serve static files from the React build directory
-    app.use(express.static(path.join(CONFIG.dirname, '../frontend/build')));
+    app.use(express.static(path.join(CONFIG.__dirname, '../frontend/build')));
 
     // Handle client-side routing
     app.get('*', (req, res) => {
         res.sendFile(path.resolve(
-            CONFIG.dirname,
+            CONFIG.__dirname,
             '../frontend',
             'build',
             'index.html'

@@ -42,7 +42,7 @@ const features = [
 const rescueImages = [
   {
     url: "https://images.unsplash.com/photo-1548199973-03cce0bbc87b",
-    alt: "German Shepherd Rescue Dog"
+    alt: "Hazard Rescue Dog"
   },
   {
     url: "https://images.unsplash.com/photo-1575425186775-b8de9a427e67",
