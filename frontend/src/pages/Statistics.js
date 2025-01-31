@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Box,
   Container,
@@ -17,8 +17,20 @@ import {
 } from '@chakra-ui/react';
 import { useAnimals } from '../context/AnimalsContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { useMemo } from 'react';
 
+/**
+ * StatCard Component
+ * A reusable card component for displaying statistical information
+ * Features:
+ * - Responsive design with consistent spacing
+ * - Theme-aware styling (light/dark mode support)
+ * - Optional help text for additional context
+ * 
+ * @param {Object} props
+ * @param {string} props.label - The title of the statistic
+ * @param {string|number} props.value - The main statistical value to display
+ * @param {string} [props.helpText] - Optional explanatory text shown below the value
+ */
 const StatCard = ({ label, value, helpText }) => {
   const bg = useColorModeValue('white', 'gray.700');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
@@ -31,82 +43,119 @@ const StatCard = ({ label, value, helpText }) => {
       borderWidth="1px"
       borderColor={borderColor}
       boxShadow="sm"
+      transition="all 0.2s"
+      _hover={{ shadow: 'md' }}
     >
       <Stat>
-        <StatLabel fontSize="lg">{label}</StatLabel>
+        <StatLabel fontSize="lg" fontWeight="medium">{label}</StatLabel>
         <StatNumber fontSize="3xl" fontWeight="bold" my={2}>
           {value}
         </StatNumber>
-        {helpText && <StatHelpText>{helpText}</StatHelpText>}
+        {helpText && <StatHelpText fontSize="sm">{helpText}</StatHelpText>}
       </Stat>
     </Box>
   );
 };
 
+/**
+ * Statistics Component
+ * Main component for displaying comprehensive animal shelter statistics
+ * Features:
+ * - Overview cards with key metrics
+ * - Interactive breed distribution chart
+ * - Recent activity metrics
+ * - Responsive layout
+ * - Loading and error states
+ * - Dark mode support
+ */
 const Statistics = () => {
+  // Theme-aware color values
   const { animals, loading, error } = useAnimals();
   const chartBg = useColorModeValue('white', 'gray.700');
   const textColor = useColorModeValue('gray.600', 'gray.200');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
-  // Calculate statistics from filtered animals data
+  /**
+   * Calculate Statistics
+   * Processes raw animal data to generate various statistics and metrics
+   * Uses useMemo to cache calculations and prevent unnecessary recalculations
+   * Returns null if no data is available
+   * 
+   * Calculated metrics include:
+   * - Animal type distribution (dogs, cats, others)
+   * - Average age
+   * - Recent adoptions and arrivals (30-day window)
+   * - Breed distribution
+   */
   const stats = useMemo(() => {
-    if (!animals || animals.length === 0) return null;
+    if (!animals?.length) return null;
 
-    // Count animals by type
-    const dogCount = animals.filter(animal => animal.type === 'dog').length;
-    const catCount = animals.filter(animal => animal.type === 'cat').length;
-    const totalAnimals = animals.length;
-    const otherCount = totalAnimals - (dogCount + catCount);
+    // Track the current date for time-based calculations
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30));
 
-    // Calculate average age
-    const totalAge = animals.reduce((sum, animal) => sum + (animal.age || 0), 0);
-    const averageAge = totalAge / totalAnimals;
+    // Initialize accumulators
+    let totalAge = 0;
+    const breedCounts = new Map();
+    let dogCount = 0;
+    let catCount = 0;
+    let adoptionsThisMonth = 0;
+    let newArrivals = 0;
 
-    // Count adoptions and new arrivals in the last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const adoptionsThisMonth = animals.filter(animal => {
-      const adoptionDate = animal.adoptionDate ? new Date(animal.adoptionDate) : null;
-      return adoptionDate && adoptionDate > thirtyDaysAgo;
-    }).length;
+    // Process each animal in a single pass for efficiency
+    animals.forEach(animal => {
+      // Update type counts
+      if (animal.type === 'dog') dogCount++;
+      else if (animal.type === 'cat') catCount++;
 
-    const newArrivals = animals.filter(animal => {
-      const arrivalDate = animal.arrivalDate ? new Date(animal.arrivalDate) : null;
-      return arrivalDate && arrivalDate > thirtyDaysAgo;
-    }).length;
+      // Update age calculations
+      if (animal.age) totalAge += animal.age;
 
-    // Count breeds
-    const breedCounts = animals.reduce((acc, animal) => {
+      // Update breed statistics
       const breed = animal.breed || 'Unknown';
-      acc[breed] = (acc[breed] || 0) + 1;
-      return acc;
-    }, {});
+      breedCounts.set(breed, (breedCounts.get(breed) || 0) + 1);
 
+      // Check recent activity
+      const adoptionDate = animal.adoptionDate ? new Date(animal.adoptionDate) : null;
+      const arrivalDate = animal.arrivalDate ? new Date(animal.arrivalDate) : null;
+
+      if (adoptionDate && adoptionDate > thirtyDaysAgo) adoptionsThisMonth++;
+      if (arrivalDate && arrivalDate > thirtyDaysAgo) newArrivals++;
+    });
+
+    const totalAnimals = animals.length;
+    
     return {
       overview: {
         totalAnimals,
         dogCount,
         catCount,
-        otherCount,
-        averageAge,
+        otherCount: totalAnimals - (dogCount + catCount),
+        averageAge: totalAge / totalAnimals,
         adoptionsThisMonth,
         newArrivals
       },
-      breedStats: breedCounts
+      // Convert Map to object for easier handling
+      breedStats: Object.fromEntries(breedCounts)
     };
   }, [animals]);
 
+  /**
+   * Render Content
+   * Handles different display states (loading, error, no data, data display)
+   * Returns appropriate UI components based on current state
+   */
   const renderContent = () => {
+    // Handle loading state
     if (loading) {
       return (
         <Box display="flex" justifyContent="center" alignItems="center" height="60vh">
-          <Spinner size="xl" color="blue.500" />
+          <Spinner size="xl" color="blue.500" thickness="4px" speed="0.65s" />
         </Box>
       );
     }
 
+    // Handle error state
     if (error) {
       return (
         <Alert
@@ -130,6 +179,7 @@ const Statistics = () => {
       );
     }
 
+    // Handle no data state
     if (!stats || !animals.length) {
       return (
         <Alert
@@ -155,21 +205,22 @@ const Statistics = () => {
 
     const { overview } = stats;
 
-    // Calculate percentages
-    const dogPercentage = ((overview.dogCount) / overview.totalAnimals * 100).toFixed(1);
-    const catPercentage = ((overview.catCount) / overview.totalAnimals * 100).toFixed(1);
+    // Calculate percentages for display
+    const dogPercentage = ((overview.dogCount / overview.totalAnimals) * 100).toFixed(1);
+    const catPercentage = ((overview.catCount / overview.totalAnimals) * 100).toFixed(1);
 
-    // Transform breed stats for the chart
+    // Prepare chart data - sort breeds by count and take top 10
     const chartData = Object.entries(stats.breedStats)
       .map(([breed, count]) => ({
         breed,
         count: Number(count)
       }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10); // Show top 10 breeds
+      .slice(0, 10);
 
     return (
       <>
+        {/* Overview Statistics Grid */}
         <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6} mb={12}>
           <StatCard
             label="Total Animals"
@@ -193,6 +244,7 @@ const Statistics = () => {
           />
         </SimpleGrid>
 
+        {/* Breed Distribution Chart */}
         <Box
           bg={chartBg}
           p={6}
@@ -200,33 +252,49 @@ const Statistics = () => {
           borderWidth="1px"
           borderColor={borderColor}
           mb={8}
+          transition="all 0.2s"
+          _hover={{ shadow: 'lg' }}
         >
           <Heading size="md" mb={6}>Top Breeds in Current Results</Heading>
           <Box height="400px">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 70 }}>
-                <CartesianGrid strokeDasharray="3 3" />
+              <BarChart 
+                data={chartData} 
+                margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" opacity={0.5} />
                 <XAxis
                   dataKey="breed"
                   angle={-45}
                   textAnchor="end"
                   height={70}
                   tick={{ fill: textColor, fontSize: 12 }}
+                  interval={0}
                 />
-                <YAxis tick={{ fill: textColor }} />
+                <YAxis 
+                  tick={{ fill: textColor }}
+                  tickFormatter={(value) => value.toLocaleString()}
+                />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: chartBg,
                     border: '1px solid #ccc',
                     borderRadius: '4px',
+                    padding: '10px'
                   }}
+                  formatter={(value) => [value.toLocaleString(), "Count"]}
                 />
-                <Bar dataKey="count" fill="#3182CE" />
+                <Bar 
+                  dataKey="count" 
+                  fill="#3182CE"
+                  radius={[4, 4, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           </Box>
         </Box>
 
+        {/* Additional Statistics Grid */}
         <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
           <StatCard
             label="Average Age"

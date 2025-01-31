@@ -65,7 +65,8 @@ const AnimalSchema = new mongoose.Schema({
     breed: {
         type: String,
         required: true,
-        trim: true
+        trim: true,
+        index: true // Index for faster breed searches
     },
     color: {
         type: String,
@@ -75,7 +76,8 @@ const AnimalSchema = new mongoose.Schema({
     sex_upon_outcome: {
         type: String,
         required: true,
-        enum: VALID_SEX_VALUES
+        enum: VALID_SEX_VALUES,
+        index: true // Index for faster sex-based queries
     },
 
     // Age Information
@@ -86,7 +88,8 @@ const AnimalSchema = new mongoose.Schema({
     age_upon_outcome_in_weeks: {
         type: Number,
         required: true,
-        min: 0
+        min: 0,
+        index: true // Index for faster age-based queries
     },
     date_of_birth: {
         type: Date,
@@ -133,6 +136,44 @@ const AnimalSchema = new mongoose.Schema({
         type: Number,
         min: -180,
         max: 180
+    },
+
+    // Medical History
+    medicalHistory: [{
+        type: String,
+        enum: ['healthy', 'surgery', 'chronic', 'injury', 'recovered'],
+        default: ['healthy']
+    }],
+
+    // Rescue Status
+    status: {
+        type: String,
+        enum: ['available', 'in_training', 'deployed', 'retired'],
+        default: 'available',
+        index: true // Index for faster status queries
+    },
+
+    // Training Progress
+    trainingProgress: {
+        type: Map,
+        of: {
+            level: {
+                type: Number,
+                min: 0,
+                max: 5,
+                default: 0
+            },
+            certificationDate: Date,
+            notes: String
+        }
+    },
+
+    // Last Assessment
+    lastAssessment: {
+        date: Date,
+        score: Number,
+        assessor: String,
+        notes: String
     }
 }, {
     timestamps: true,
@@ -149,6 +190,9 @@ AnimalSchema.index({ animal_id: 1 }, { unique: true });
 AnimalSchema.index({ breed: 1 });
 AnimalSchema.index({ sex_upon_outcome: 1 });
 AnimalSchema.index({ age_upon_outcome_in_weeks: 1 });
+AnimalSchema.index({ status: 1, breed: 1 });
+AnimalSchema.index({ status: 1, age_upon_outcome_in_weeks: 1 });
+AnimalSchema.index({ breed: 1, age_upon_outcome_in_weeks: 1, sex_upon_outcome: 1 });
 
 // ============= Virtuals =============
 

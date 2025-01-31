@@ -29,14 +29,19 @@ import {
 import { FaDog, FaCat, FaMapMarkerAlt } from 'react-icons/fa';
 import { useAnimals } from '../context/AnimalsContext';
 
-// Memoized Map Controller Component
+/**
+ * MapController Component
+ * A memoized controller component that handles map view updates based on selected locations
+ * Uses react-leaflet's useMap hook to access the map instance
+ * Animates map movements when center or zoom changes
+ */
 const MapController = React.memo(({ center, zoom }) => {
   const map = useMap();
   
   useEffect(() => {
     if (center && map) {
       try {
-        // Add a small delay to ensure the map is properly initialized
+        // Add slight delay to ensure smooth transitions
         const timer = setTimeout(() => {
           map.setView(center, zoom, {
             animate: true,
@@ -54,7 +59,11 @@ const MapController = React.memo(({ center, zoom }) => {
   return null;
 });
 
-// Create custom icon factory with memoization
+/**
+ * Icon Cache and Generator
+ * Caches custom markers to improve performance by avoiding recreating icons
+ * Creates distinct icons for dogs and cats with different colors and count displays
+ */
 const iconCache = new Map();
 const getCustomIcon = (count, type) => {
   const key = `${count}-${type}`;
@@ -88,7 +97,12 @@ const getCustomIcon = (count, type) => {
   return iconCache.get(key);
 };
 
-// Memoized Stat Card Component
+/**
+ * StatCard Component
+ * Displays summary statistics in an interactive card format
+ * Supports icons, labels, values, and click handlers
+ * Uses Chakra UI's color mode values for consistent theming
+ */
 const StatCard = React.memo(({ icon: Icon, label, value, color, location, onClick }) => {
   const bg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
@@ -117,7 +131,12 @@ const StatCard = React.memo(({ icon: Icon, label, value, color, location, onClic
   );
 });
 
-// Memoized Marker Component
+/**
+ * LocationMarker Component
+ * Renders individual map markers with popups showing animal counts
+ * Includes a highlight circle for selected locations
+ * Uses custom icons based on animal type and count
+ */
 const LocationMarker = React.memo(({ location, isSelected, onMarkerClick }) => {
   return (
     <React.Fragment>
@@ -154,7 +173,12 @@ const LocationMarker = React.memo(({ location, isSelected, onMarkerClick }) => {
   );
 });
 
-// Memoized Table Row Component
+/**
+ * TableRow Component
+ * Renders individual rows in the animals table
+ * Supports selection highlighting and click handling
+ * Memoized to optimize performance with large datasets
+ */
 const TableRow = React.memo(({ animal, isSelected, onClick, hoverBgColor, selectedBgColor }) => (
   <Tr
     _hover={{ bg: hoverBgColor }}
@@ -172,24 +196,49 @@ const TableRow = React.memo(({ animal, isSelected, onClick, hoverBgColor, select
   </Tr>
 ));
 
+/**
+ * MapView Component
+ * Main component that integrates map visualization with data table
+ * Features:
+ * - Interactive map with location markers
+ * - Filterable and sortable data table
+ * - Pagination controls
+ * - Summary statistics
+ * - Responsive layout
+ */
 const MapView = () => {
+  // State management for UI interactions
   const { animals, loading, error } = useAnimals();
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [selectedAnimal, setSelectedAnimal] = useState(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [mapKey, setMapKey] = useState(0); // Add key for map remounting
+  const [mapKey, setMapKey] = useState(0);
+  const [selectedFilter, setSelectedFilter] = useState('all');
 
+  // Theme-aware styling values
   const bg = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
   const hoverBgColor = useColorModeValue('gray.50', 'gray.700');
   const selectedBgColor = useColorModeValue('blue.50', 'blue.900');
 
-  // Optimized data processing with memoization
+  /**
+   * Data Processing with useMemo
+   * Processes raw animal data to:
+   * - Group animals by location
+   * - Calculate statistics
+   * - Apply filters and sorting
+   */
   const { locationGroups, stats, sortedAnimals } = useMemo(() => {
     if (!animals?.length) return { locationGroups: [], stats: null, sortedAnimals: [] };
 
+    // Apply type filter (all, dogs, or cats)
+    const filteredAnimals = selectedFilter === 'all' 
+      ? animals 
+      : animals.filter(animal => animal.animal_type === selectedFilter);
+
+    // Group animals by location and calculate statistics
     const groups = new Map();
     let totalDogs = 0;
     let totalCats = 0;
@@ -198,8 +247,7 @@ const MapView = () => {
     let maxCatLocation = null;
     let maxCatCount = 0;
 
-    // Process animals in a single pass
-    animals.forEach(animal => {
+    filteredAnimals.forEach(animal => {
       if (!animal.location_lat || !animal.location_long) return;
       
       const locationKey = `${animal.location_lat},${animal.location_long}`;
@@ -219,6 +267,7 @@ const MapView = () => {
       const group = groups.get(locationKey);
       group.animals.push(animal);
       
+      // Update counts and track maximum locations
       if (animal.animal_type === 'Dog') {
         group.dogs++;
         totalDogs++;
@@ -245,9 +294,9 @@ const MapView = () => {
       group.total++;
     });
 
-    // Sort animals with memoized comparison function
+    // Apply sorting to filtered animals
     const getSortValue = (item, key) => (item[key] || '').toString().toLowerCase();
-    const sorted = [...animals].sort((a, b) => {
+    const sorted = [...filteredAnimals].sort((a, b) => {
       if (!sortConfig.key) return 0;
       const aValue = getSortValue(a, sortConfig.key);
       const bValue = getSortValue(b, sortConfig.key);
@@ -268,9 +317,9 @@ const MapView = () => {
       },
       sortedAnimals: sorted
     };
-  }, [animals, sortConfig]);
+  }, [animals, sortConfig, selectedFilter]);
 
-  // Memoized pagination
+  // Calculate paginated subset of animals
   const paginatedAnimals = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return sortedAnimals.slice(startIndex, startIndex + itemsPerPage);
@@ -278,7 +327,7 @@ const MapView = () => {
 
   const totalPages = Math.ceil(sortedAnimals.length / itemsPerPage);
 
-  // Memoized handlers
+  // Event Handlers
   const handleSort = useCallback((key) => {
     setSortConfig(prevConfig => ({
       key,
@@ -292,7 +341,7 @@ const MapView = () => {
       longitude: location.longitude
     });
     
-    // Find the first animal in this location and select it
+    // Find and select the first animal at this location
     const animalAtLocation = animals.find(animal => 
       animal.location_lat === location.latitude && 
       animal.location_long === location.longitude
@@ -300,8 +349,7 @@ const MapView = () => {
     
     if (animalAtLocation) {
       setSelectedAnimal(animalAtLocation);
-      
-      // Find the page that contains this animal
+      // Update pagination to show the selected animal
       const animalIndex = sortedAnimals.findIndex(a => a.animal_id === animalAtLocation.animal_id);
       if (animalIndex !== -1) {
         const newPage = Math.floor(animalIndex / itemsPerPage) + 1;
@@ -320,11 +368,13 @@ const MapView = () => {
     setSelectedAnimal(animal);
   }, []);
 
-  // Reset map when data changes
+  // Reset map and pagination when data or filter changes
   useEffect(() => {
     setMapKey(prev => prev + 1);
-  }, [animals]);
+    setCurrentPage(1);
+  }, [animals, selectedFilter]);
 
+  // Loading state
   if (loading) {
     return (
       <Container maxW="container.xl" py={8}>
@@ -335,6 +385,7 @@ const MapView = () => {
     );
   }
 
+  // Error state
   if (error) {
     return (
       <Container maxW="container.xl" py={8}>
@@ -358,10 +409,25 @@ const MapView = () => {
     );
   }
 
+  // Main render
   return (
     <Container maxW="container.xl" py={8}>
       <Heading size="lg" mb={6}>Animal Locations</Heading>
 
+      {/* Animal Type Filter */}
+      <Flex mb={6} gap={4} align="center">
+        <Select
+          value={selectedFilter}
+          onChange={(e) => setSelectedFilter(e.target.value)}
+          width="200px"
+        >
+          <option value="all">All Animals</option>
+          <option value="Dog">Dogs Only</option>
+          <option value="Cat">Cats Only</option>
+        </Select>
+      </Flex>
+
+      {/* Statistics Cards */}
       <SimpleGrid columns={2} spacing={4} mb={6}>
         <StatCard
           icon={FaDog}
@@ -380,7 +446,8 @@ const MapView = () => {
           onClick={() => stats?.maxCatLocation && setSelectedLocation(stats.maxCatLocation)}
         />
       </SimpleGrid>
-      
+
+      {/* Map Container */}
       <Box
         bg={bg}
         borderRadius="lg"
@@ -394,7 +461,7 @@ const MapView = () => {
       >
         <MapContainer
           key={mapKey}
-          center={[30.2672, -97.7431]}
+          center={[30.2672, -97.7431]} // Default center coordinates
           zoom={12}
           style={{ height: '100%', width: '100%' }}
           zoomControl={false}
@@ -408,6 +475,7 @@ const MapView = () => {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
+          {/* Render location markers */}
           {locationGroups.map((location) => (
             <LocationMarker
               key={location.id}
@@ -421,6 +489,7 @@ const MapView = () => {
         </MapContainer>
       </Box>
 
+      {/* Data Table Section */}
       <Box
         bg={bg}
         borderRadius="xl"
@@ -429,6 +498,7 @@ const MapView = () => {
         overflow="hidden"
         shadow="xl"
       >
+        {/* Table Controls */}
         <Box p={6} borderBottomWidth="1px" borderColor={borderColor}>
           <Flex justify="space-between" align="center">
             <Select
@@ -447,6 +517,7 @@ const MapView = () => {
           </Flex>
         </Box>
 
+        {/* Animals Table */}
         <Box overflowX="auto">
           <Table variant="simple">
             <Thead>
@@ -478,6 +549,7 @@ const MapView = () => {
           </Table>
         </Box>
 
+        {/* Pagination Controls */}
         <Box p={4} borderTopWidth="1px" borderColor={borderColor}>
           <Flex justify="space-between" align="center">
             <Text color="gray.500">
@@ -509,4 +581,5 @@ const MapView = () => {
   );
 };
 
+// Export memoized component to prevent unnecessary re-renders
 export default React.memo(MapView);

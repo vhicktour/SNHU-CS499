@@ -27,6 +27,24 @@ A comprehensive web application for managing animal rescue operations. This plat
 - Age range filtering
 - Status tracking
 
+### Advanced Rescue Matching System
+- Sophisticated scoring algorithm for optimal animal-rescue pairing
+- Multi-factor analysis including:
+  - Breed compatibility (35%)
+  - Age appropriateness (25%)
+  - Sex requirements (20%)
+  - Health assessment (20%)
+- Performance optimized with caching and database indexing
+- Detailed scoring breakdown for transparency
+- Automatic filtering of unsuitable matches
+
+### Animal Health Tracking
+- Comprehensive medical history tracking
+- Training progress monitoring
+- Assessment history
+- Real-time status updates
+- Geolocation support for rescue operations
+
 ## Tech Stack
 
 ### Frontend
@@ -162,9 +180,56 @@ MONGODB_URI=your_mongodb_connection_string
 ### Animals
 - GET /api/animals - Fetch all animals
 - GET /api/animals/stats - Get statistics
+- GET /api/animals/rescue/:type - Get rescue-suitable animals with scores
 - POST /api/animals - Add new animal
 - PUT /api/animals/:id - Update animal
 - DELETE /api/animals/:id - Remove animal
+
+### Rescue Matching
+- GET /api/animals/rescue/suitable/:type - Get scored animals for specific rescue type
+- GET /api/animals/rescue/stats - Get rescue matching statistics
+- GET /api/animals/rescue/history - Get historical rescue matching data
+
+## Technical Features
+
+### Performance Optimizations
+- In-memory caching with 5-minute TTL
+- Strategic database indexing
+  - Single-field indexes for common queries
+  - Compound indexes for complex queries
+  - Geospatial indexing for location-based searches
+- Asynchronous score calculations
+- Efficient data structures for quick lookups
+
+### Data Models
+
+#### Animal Schema
+```javascript
+{
+  // Basic Information
+  name: String,
+  breed: String,
+  age: Number,
+  sex: String,
+  
+  // Health and Training
+  medicalHistory: [String],
+  trainingProgress: Map,
+  lastAssessment: {
+    date: Date,
+    score: Number,
+    assessor: String,
+    notes: String
+  },
+  
+  // Rescue Status
+  status: String,
+  location: {
+    type: String,
+    coordinates: [Number]
+  }
+}
+```
 
 ## Contact
 

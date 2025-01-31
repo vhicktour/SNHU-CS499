@@ -83,6 +83,105 @@ const buildRescueTypeQuery = (type) => {
     };
 };
 
+// ============= Cache and Scoring =============
+
+/**
+ * Cache for storing rescue scores
+ * Using Map for O(1) lookup performance
+ * @type {Map<string, {score: number, timestamp: number}>}
+ */
+const rescueScoresCache = new Map();
+
+/**
+ * Cache TTL in milliseconds (5 minutes)
+ */
+const CACHE_TTL = 5 * 60 * 1000;
+
+/**
+ * Scoring weights for different criteria
+ */
+const SCORING_WEIGHTS = {
+    breedMatch: 0.35,
+    ageMatch: 0.25,
+    sexMatch: 0.20,
+    healthScore: 0.20
+};
+
+/**
+ * Calculate health score based on animal's medical history
+ * @param {Object} animal - Animal document
+ * @returns {number} Score between 0 and 1
+ */
+const calculateHealthScore = (animal) => {
+    let score = 1.0;
+    
+    // Deduct points for health issues
+    if (animal.medicalHistory) {
+        if (animal.medicalHistory.includes('surgery')) score -= 0.2;
+        if (animal.medicalHistory.includes('chronic')) score -= 0.3;
+        if (animal.medicalHistory.includes('injury')) score -= 0.15;
+    }
+    
+    // Ensure score stays between 0 and 1
+    return Math.max(0, Math.min(1, score));
+};
+
+/**
+ * Calculate breed match score
+ * @param {string} breed - Animal breed
+ * @param {string} rescueType - Type of rescue work
+ * @returns {number} Score between 0 and 1
+ */
+const calculateBreedMatchScore = (breed, rescueType) => {
+    const filters = RESCUE_TYPE_FILTERS[rescueType];
+    if (!filters) return 0;
+
+    // Check for exact matches first
+    const exactMatch = filters.some(filter => 
+        filter.breed.toString().slice(1, -2).toLowerCase() === breed.toLowerCase()
+    );
+    if (exactMatch) return 1;
+
+    // Check for partial matches
+    const partialMatch = filters.some(filter => 
+        breed.toLowerCase().match(filter.breed)
+    );
+    return partialMatch ? 0.7 : 0;
+};
+
+/**
+ * Calculate age match score
+ * @param {number} age - Animal age in months
+ * @param {Object} requirements - Rescue type requirements
+ * @returns {number} Score between 0 and 1
+ */
+const calculateAgeMatchScore = (age, requirements) => {
+    if (!requirements) return 0;
+    const { minAge, maxAge } = requirements;
+    
+    // Perfect age range
+    if (age >= minAge && age <= maxAge) return 1;
+    
+    // Calculate score based on distance from ideal range
+    const distanceFromRange = age < minAge ? 
+        minAge - age : 
+        age - maxAge;
+    
+    // Score decreases linearly with distance from range
+    return Math.max(0, 1 - (distanceFromRange / minAge));
+};
+
+/**
+ * Calculate sex match score
+ * @param {string} sex - Animal sex
+ * @param {Object} requirements - Rescue type requirements
+ * @returns {number} Score between 0 and 1
+ */
+const calculateSexMatchScore = (sex, requirements) => {
+    if (!requirements || !requirements.sex) return 0;
+    return sex === requirements.sex ? 1 : 0;
+};
+
 // ============= Controller Methods =============
 
 /**
@@ -196,12 +295,75 @@ export const deleteAnimal = async (id) => {
 };
 
 /**
- * Get rescue-suitable animals
+ * Get rescue-suitable animals with sophisticated scoring
  * @param {string} rescueType - Type of rescue work
- * @returns {Promise<Array>} Array of suitable animals
+ * @returns {Promise<Array>} Array of suitable animals with scores
  */
 export const getRescueSuitableAnimals = async (rescueType) => {
-    return await Animal.findRescueSuitable(rescueType);
+    try {
+        // Validate rescue type
+        if (!RESCUE_TYPE_REQUIREMENTS[rescueType]) {
+            throw new Error('Invalid rescue type');
+        }
+
+        // Get all potential animals
+        const query = buildRescueTypeQuery(rescueType);
+        const animals = await Animal.find(query);
+
+        // Calculate and cache scores for each animal
+        const scoredAnimals = await Promise.all(animals.map(async (animal) => {
+            // Check cache first
+            const cacheKey = `${animal._id}-${rescueType}`;
+            const cachedScore = rescueScoresCache.get(cacheKey);
+            
+            if (cachedScore && (Date.now() - cachedScore.timestamp) < CACHE_TTL) {
+                return {
+                    ...animal.toObject(),
+                    rescueScore: cachedScore.score
+                };
+            }
+
+            // Calculate individual scores
+            const breedScore = calculateBreedMatchScore(animal.breed, rescueType);
+            const ageScore = calculateAgeMatchScore(animal.age, RESCUE_TYPE_REQUIREMENTS[rescueType]);
+            const sexScore = calculateSexMatchScore(animal.sex, RESCUE_TYPE_REQUIREMENTS[rescueType]);
+            const healthScore = calculateHealthScore(animal);
+
+            // Calculate weighted total score
+            const totalScore = (
+                breedScore * SCORING_WEIGHTS.breedMatch +
+                ageScore * SCORING_WEIGHTS.ageMatch +
+                sexScore * SCORING_WEIGHTS.sexMatch +
+                healthScore * SCORING_WEIGHTS.healthScore
+            );
+
+            // Cache the score
+            rescueScoresCache.set(cacheKey, {
+                score: totalScore,
+                timestamp: Date.now()
+            });
+
+            // Return animal with score
+            return {
+                ...animal.toObject(),
+                rescueScore: totalScore,
+                scoreDetails: {
+                    breedScore,
+                    ageScore,
+                    sexScore,
+                    healthScore
+                }
+            };
+        }));
+
+        // Sort by score and filter out low-scoring animals
+        return scoredAnimals
+            .filter(animal => animal.rescueScore >= 0.6) // Only return animals with decent scores
+            .sort((a, b) => b.rescueScore - a.rescueScore);
+    } catch (error) {
+        console.error('Error in getRescueSuitableAnimals:', error);
+        throw error;
+    }
 };
 
 /**
