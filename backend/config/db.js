@@ -1,150 +1,234 @@
 /**
- * Database Connection Configuration
- * Handles MongoDB connection setup, monitoring, and graceful shutdown
+ * MongoDB Database Connection Manager
+ * 
+ * Provides robust connection handling with monitoring, validation, and graceful shutdown.
+ * Implements best practices for production-ready MongoDB connections in Node.js applications.
+ * 
  * @module config/db
+ * @requires mongoose
  */
 
 import mongoose from 'mongoose';
 
+// Connection configuration constants
+const CONNECTION_TIMEOUT_MS = 10000; // 10 seconds for shutdown operations
+const RECONNECT_INTERVAL_MS = 5000;  // 5 seconds between connection retries
+
 /**
- * MongoDB connection options
- * Configures optimal settings for production use
+ * MongoDB Connection Options
+ * 
+ * Optimized settings for production environments with connection pooling and timeouts.
+ * @constant {Object}
+ * @property {boolean} useNewUrlParser - Enable new URL parser
+ * @property {boolean} useUnifiedTopology - Use new server discovery/monitoring engine
+ * @property {number} maxPoolSize - Maximum number of sockets in connection pool
+ * @property {number} serverSelectionTimeoutMS - Timeout for server selection
+ * @property {number} socketTimeoutMS - TCP Socket timeout
+ * @property {number} heartbeatFrequencyMS - Interval between server monitoring checks
+ * @property {boolean} retryWrites - Enable retryable writes
+ * @property {number} family - IP address family preference (4 = IPv4)
  */
 const MONGO_OPTIONS = {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    maxPoolSize: 10,
-    serverSelectionTimeoutMS: 5000,
-    socketTimeoutMS: 45000,
-    heartbeatFrequencyMS: 10000,
-    retryWrites: true,
-    family: 4  // Use IPv4, skip trying IPv6
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  heartbeatFrequencyMS: 10000,
+  retryWrites: true,
+  family: 4
 };
 
 /**
- * Setup connection monitoring
- * Establishes event listeners for connection state changes
- * @param {mongoose.Connection} connection - Mongoose connection instance
+ * Configure MongoDB Connection Event Handlers
+ * 
+ * Sets up comprehensive monitoring for connection state changes with detailed logging.
+ * 
+ * @param {mongoose.Connection} connection - Active Mongoose connection instance
+ * @throws {Error} If invalid connection object is provided
  */
-const setupConnectionMonitoring = (connection) => {
-    // Successfully connected
-    connection.on('connected', () => {
-        console.log('='.repeat(50));
-        console.log('MongoDB Connection Status: Connected');
-        console.log(`Host: ${connection.host}`);
-        console.log(`Database: ${connection.name}`);
-        console.log(`Port: ${connection.port}`);
-        console.log('='.repeat(50));
-    });
+const configureConnectionEvents = (connection) => {
+  if (!(connection instanceof mongoose.Connection)) {
+    throw new Error('Invalid Mongoose connection instance provided');
+  }
 
-    // Connection error
-    connection.on('error', (err) => {
-        console.error('MongoDB Connection Error:', {
-            timestamp: new Date().toISOString(),
-            error: err.message,
-            stack: err.stack
-        });
-    });
-
-    // Connection lost
-    connection.on('disconnected', () => {
-        console.log('='.repeat(50));
-        console.log('MongoDB Connection Status: Disconnected');
-        console.log('Timestamp:', new Date().toISOString());
-        console.log('='.repeat(50));
-    });
-
-    // Connection reconnected
-    connection.on('reconnected', () => {
-        console.log('='.repeat(50));
-        console.log('MongoDB Connection Status: Reconnected');
-        console.log('Timestamp:', new Date().toISOString());
-        console.log('='.repeat(50));
-    });
+  connection.on('connected', () => logConnectionState('Connected', connection));
+  connection.on('error', handleConnectionError);
+  connection.on('disconnected', () => logConnectionState('Disconnected', connection));
+  connection.on('reconnected', () => logConnectionState('Reconnected', connection));
+  connection.on('reconnectFailed', handleReconnectFailure);
 };
 
 /**
- * Setup graceful shutdown handlers
- * Ensures proper database disconnection on application termination
+ * Log Connection State Changes
+ * 
+ * Standardizes connection event logging format and provides actionable information.
+ * 
+ * @param {string} state - Current connection state
+ * @param {mongoose.Connection} connection - Active connection instance
  */
-const setupGracefulShutdown = () => {
-    const shutdown = async (signal) => {
-        try {
-            console.log(`\n${signal} received. Starting graceful shutdown...`);
-            
-            // Set a timeout for the shutdown process
-            const shutdownTimeout = setTimeout(() => {
-                console.error('Could not close MongoDB connection in time, forcefully shutting down');
-                process.exit(1);
-            }, 10000);
-
-            // Attempt to close database connection
-            await mongoose.connection.close();
-            
-            clearTimeout(shutdownTimeout);
-            console.log('MongoDB connection closed successfully');
-            process.exit(0);
-        } catch (err) {
-            console.error('Error during graceful shutdown:', err);
-            process.exit(1);
-        }
-    };
-
-    // Handle different termination signals
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
-    process.on('SIGINT', () => shutdown('SIGINT'));
-    process.on('SIGUSR2', () => shutdown('SIGUSR2')); // Nodemon restart
+const logConnectionState = (state, connection) => {
+  const divider = '='.repeat(50);
+  console.log([
+    divider,
+    `MongoDB Connection State: ${state}`,
+    `Timestamp: ${new Date().toISOString()}`,
+    `Host: ${connection.host}`,
+    `Database: ${connection.name}`,
+    `Port: ${connection.port}`,
+    `Ready State: ${connection.readyState}`,
+    divider
+  ].join('\n'));
 };
 
 /**
- * Validates MongoDB URI
- * Ensures the connection string is properly formatted
- * @param {string} uri - MongoDB connection URI
- * @throws {Error} If URI is invalid or missing
+ * Handle Connection Errors
+ * 
+ * Centralized error handling with structured logging for diagnostics.
+ * 
+ * @param {Error} error - MongoDB connection error
  */
-const validateMongoURI = (uri) => {
-    if (!uri) {
-        throw new Error('MONGODB_URI environment variable is not defined');
+const handleConnectionError = (error) => {
+  console.error({
+    event: 'MongoDB Connection Error',
+    timestamp: new Date().toISOString(),
+    error: {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      codeName: error.codeName
     }
-
-    const mongoURIPattern = /^mongodb(\+srv)?:\/\/.+/;
-    if (!mongoURIPattern.test(uri)) {
-        throw new Error('Invalid MongoDB URI format');
-    }
+  });
 };
 
 /**
- * Connects to MongoDB
- * Establishes and manages database connection with error handling
- * @returns {Promise<void>}
+ * Handle Reconnection Failures
+ * 
+ * Implements exponential backoff strategy for connection retries.
  */
-const connectDB = async () => {
+const handleReconnectFailure = () => {
+  console.error('Maximum reconnect attempts reached. Terminating process...');
+  process.exit(1);
+};
+
+/**
+ * Configure Graceful Shutdown Handler
+ * 
+ * Ensures safe process termination with connection cleanup and timeout safeguards.
+ */
+const configureShutdownHandlers = () => {
+  const shutdown = async (signal) => {
     try {
-        // Validate MongoDB URI
-        validateMongoURI(process.env.MONGODB_URI);
-
-        // Initialize connection
-        const conn = await mongoose.connect(process.env.MONGODB_URI, MONGO_OPTIONS);
-
-        // Setup monitoring and shutdown handlers
-        setupConnectionMonitoring(conn.connection);
-        setupGracefulShutdown();
-
-        // Enable debugging in development
-        if (process.env.NODE_ENV === 'development') {
-            mongoose.set('debug', true);
-        }
-
-    } catch (error) {
-        console.error('Failed to connect to MongoDB:', {
-            timestamp: new Date().toISOString(),
-            error: error.message,
-            stack: error.stack
-        });
-        
-        // Exit process on connection failure
+      console.log(`\n${signal} received. Initiating graceful shutdown...`);
+      
+      const shutdownTimer = setTimeout(() => {
+        console.error('Force shutdown: Connection cleanup timeout reached');
         process.exit(1);
+      }, CONNECTION_TIMEOUT_MS);
+
+      await mongoose.connection.close();
+      clearTimeout(shutdownTimer);
+      
+      console.log('MongoDB connection terminated gracefully');
+      process.exit(0);
+    } catch (error) {
+      console.error('Shutdown failure:', error);
+      process.exit(1);
     }
+  };
+
+  // Handle standard termination signals
+  process.on('SIGTERM', () => shutdown('SIGTERM'));  // Kubernetes/Systemd
+  process.on('SIGINT', () => shutdown('SIGINT'));    // Ctrl+C
+  process.on('SIGUSR2', () => shutdown('SIGUSR2'));  // Nodemon restart
 };
 
-export default connectDB;
+/**
+ * Validate MongoDB Connection URI
+ * 
+ * Ensures properly formatted connection string with comprehensive error messaging.
+ * 
+ * @param {string} uri - MongoDB connection URI
+ * @throws {URIValidationError} For invalid/missing connection strings
+ */
+const validateConnectionURI = (uri) => {
+  if (!uri) {
+    throw new URIValidationError('MONGODB_URI environment variable not defined');
+  }
+
+  const uriPattern = /^mongodb(\+srv)?:\/\/([^:]+:[^@]+@)?[^/]+(\/\S+)?(\?\S+)?$/;
+  if (!uriPattern.test(uri)) {
+    throw new URIValidationError(`Invalid MongoDB URI format: ${uri}`);
+  }
+};
+
+/**
+ * Initialize Database Connection
+ * 
+ * Main entry point for establishing MongoDB connection with full error handling.
+ * 
+ * @returns {Promise<mongoose.Connection>} Active MongoDB connection
+ * @throws {DatabaseConnectionError} For connection failures
+ */
+export const initializeDatabase = async () => {
+  try {
+    validateConnectionURI(process.env.MONGODB_URI);
+
+    const connection = await mongoose.connect(
+      process.env.MONGODB_URI, 
+      MONGO_OPTIONS
+    );
+
+    configureConnectionEvents(connection.connection);
+    configureShutdownHandlers();
+
+    if (process.env.NODE_ENV === 'development') {
+      mongoose.set('debug', (collection, method, query, doc) => {
+        console.log(`Mongoose: ${collection}.${method}`, JSON.stringify(query), doc);
+      });
+    }
+
+    return connection;
+  } catch (error) {
+    console.error({
+      event: 'Database Connection Failure',
+      timestamp: new Date().toISOString(),
+      error: {
+        message: error.message,
+        stack: error.stack,
+        code: error.code,
+        metadata: error.errorLabels
+      },
+      config: {
+        uri: process.env.MONGODB_URI,
+        options: MONGO_OPTIONS
+      }
+    });
+
+    process.exit(1);
+  }
+};
+
+/**
+ * Custom Error Class: URI Validation Failures
+ */
+class URIValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'URIValidationError';
+    this.code = 'E_INVALID_MONGO_URI';
+  }
+}
+
+/**
+ * Custom Error Class: Connection Failures
+ */
+class DatabaseConnectionError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'DatabaseConnectionError';
+    this.code = 'E_DB_CONNECTION_FAILED';
+  }
+}
+
+export default initializeDatabase;

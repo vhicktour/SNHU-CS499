@@ -12,7 +12,7 @@ import Statistics from './pages/Statistics';
 import MapView from './pages/MapView';
 import { AnimalsProvider } from './context/AnimalsContext';
 
-// Home page component that includes the original dashboard layout
+// Home page component
 const Home = () => (
   <>
     <HeroSection />

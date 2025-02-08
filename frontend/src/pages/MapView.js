@@ -231,93 +231,99 @@ const MapView = () => {
    * - Apply filters and sorting
    */
   const { locationGroups, stats, sortedAnimals } = useMemo(() => {
-    if (!animals?.length) return { locationGroups: [], stats: null, sortedAnimals: [] };
+  if (!animals?.length) return { locationGroups: [], stats: null, sortedAnimals: [] };
 
-    // Apply type filter (all, dogs, or cats)
-    const filteredAnimals = selectedFilter === 'all' 
-      ? animals 
-      : animals.filter(animal => animal.animal_type === selectedFilter);
+  // Apply type filter (case-insensitive)
+  const filteredAnimals = selectedFilter === 'all' 
+    ? animals 
+    : animals.filter(animal => animal.animal_type.toLowerCase() === selectedFilter.toLowerCase());
 
-    // Group animals by location and calculate statistics
-    const groups = new Map();
-    let totalDogs = 0;
-    let totalCats = 0;
-    let maxDogLocation = null;
-    let maxDogCount = 0;
-    let maxCatLocation = null;
-    let maxCatCount = 0;
+  const groups = new Map();
+  let totalDogs = 0;
+  let totalCats = 0;
+  let maxDogLocation = null;
+  let maxDogCount = 0;
+  let maxCatLocation = null;
+  let maxCatCount = 0;
 
-    filteredAnimals.forEach(animal => {
-      if (!animal.location_lat || !animal.location_long) return;
-      
-      const locationKey = `${animal.location_lat},${animal.location_long}`;
-      
-      if (!groups.has(locationKey)) {
-        groups.set(locationKey, {
-          id: locationKey,
-          latitude: animal.location_lat,
-          longitude: animal.location_long,
-          dogs: 0,
-          cats: 0,
-          total: 0,
-          animals: []
-        });
+  // Function to round coordinates to 4 decimal places
+  const roundCoord = (coord) => Math.round(parseFloat(coord) * 10000) / 10000;
+
+  filteredAnimals.forEach(animal => {
+    if (!animal.location_lat || !animal.location_long) return;
+    
+    // Use rounded coordinates
+    const lat = roundCoord(animal.location_lat);
+    const lng = roundCoord(animal.location_long);
+    const locationKey = `${lat},${lng}`;
+    
+    if (!groups.has(locationKey)) {
+      groups.set(locationKey, {
+        id: locationKey,
+        latitude: lat,
+        longitude: lng,
+        dogs: 0,
+        cats: 0,
+        total: 0,
+        animals: []
+      });
+    }
+
+    const group = groups.get(locationKey);
+    group.animals.push(animal);
+    
+    // Use case-insensitive comparisons
+    if (animal.animal_type.toLowerCase() === 'dog') {
+      group.dogs++;
+      totalDogs++;
+      if (group.dogs > maxDogCount) {
+        maxDogCount = group.dogs;
+        maxDogLocation = {
+          latitude: lat,
+          longitude: lng,
+          count: group.dogs
+        };
       }
-
-      const group = groups.get(locationKey);
-      group.animals.push(animal);
-      
-      // Update counts and track maximum locations
-      if (animal.animal_type === 'Dog') {
-        group.dogs++;
-        totalDogs++;
-        if (group.dogs > maxDogCount) {
-          maxDogCount = group.dogs;
-          maxDogLocation = {
-            latitude: animal.location_lat,
-            longitude: animal.location_long,
-            count: group.dogs
-          };
-        }
-      } else if (animal.animal_type === 'Cat') {
-        group.cats++;
-        totalCats++;
-        if (group.cats > maxCatCount) {
-          maxCatCount = group.cats;
-          maxCatLocation = {
-            latitude: animal.location_lat,
-            longitude: animal.location_long,
-            count: group.cats
-          };
-        }
+    } else if (animal.animal_type.toLowerCase() === 'cat') {
+      group.cats++;
+      totalCats++;
+      if (group.cats > maxCatCount) {
+        maxCatCount = group.cats;
+        maxCatLocation = {
+          latitude: lat,
+          longitude: lng,
+          count: group.cats
+        };
       }
-      group.total++;
-    });
+    }
+    group.total++;
+  });
 
-    // Apply sorting to filtered animals
-    const getSortValue = (item, key) => (item[key] || '').toString().toLowerCase();
-    const sorted = [...filteredAnimals].sort((a, b) => {
-      if (!sortConfig.key) return 0;
-      const aValue = getSortValue(a, sortConfig.key);
-      const bValue = getSortValue(b, sortConfig.key);
-      return (
-        sortConfig.direction === 'asc'
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue)
-      );
-    });
+  // Sorting logic (unchanged)
+  const getSortValue = (item, key) => (item[key] || '').toString().toLowerCase();
+  const sorted = [...filteredAnimals].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    const aValue = getSortValue(a, sortConfig.key);
+    const bValue = getSortValue(b, sortConfig.key);
+    return (
+      sortConfig.direction === 'asc'
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue)
+    );
+  });
 
-    return {
-      locationGroups: Array.from(groups.values()),
-      stats: {
-        totalDogs,
-        totalCats,
-        maxDogLocation,
-        maxCatLocation
-      },
-      sortedAnimals: sorted
-    };
-  }, [animals, sortConfig, selectedFilter]);
+  return {
+    locationGroups: Array.from(groups.values()),
+    stats: {
+      totalDogs,
+      totalCats,
+      maxDogLocation,
+      maxCatLocation
+    },
+    sortedAnimals: sorted
+  };
+}, [animals, sortConfig, selectedFilter]);
+
 
   // Calculate paginated subset of animals
   const paginatedAnimals = useMemo(() => {
